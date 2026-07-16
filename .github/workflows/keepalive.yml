@@ -1,0 +1,52 @@
+name: Keepalive Workflow
+
+on:
+  schedule:
+    # 每天 UTC 时间 0:00 和 12:00 运行（可根据需要修改 cron 表达式）
+    - cron: '0 0,12 * * 1'
+  workflow_dispatch: # 允许手动触发测试
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # 必须授予写入权限以提交代码
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Update README with timestamp
+        run: |
+          # 获取当前 UTC 时间
+          CURRENT_TIME=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          
+          # 检查 README.md 是否存在，若不存在则创建最小化版本
+          if [ ! -f README.md ]; then
+            echo "# Project Keepalive" > README.md
+          fi
+          
+          # 在 README 末尾追加或更新时间戳标记
+          # 使用 sed 替换现有的时间戳行，若不存在则追加
+          if grep -q "Last Keepalive:" README.md; then
+            sed -i "s/Last Keepalive: .*/Last Keepalive: ${CURRENT_TIME}/" README.md
+          else
+            echo "" >> README.md
+            echo "<!-- Last Keepalive: ${CURRENT_TIME} -->" >> README.md
+          fi
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # 只有当文件有变更时才提交，避免空提交报错
+          if [ -n "$(git status --porcelain)" ]; then
+            git add README.md
+            git commit -m "chore: auto keepalive update at ${CURRENT_TIME}"
+            git push
+          else
+            echo "No changes to commit."
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
